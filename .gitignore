@@ -8,3 +8,5 @@ coverage/
 *.tsbuildinfo
 .insforge/
 .vercel/
+talos-repo.zip
+terac-baseline-evidence.json
