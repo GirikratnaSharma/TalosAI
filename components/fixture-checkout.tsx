@@ -98,7 +98,10 @@ export function FixtureCheckout({
             <button
               className={styles.button}
               type="submit"
-              disabled={submission.status === "submitting"}
+              disabled={
+                submission.status === "submitting" ||
+                email.trim().length === 0
+              }
               data-replay-target="submit-checkout"
             >
               {submission.status === "submitting"
@@ -107,31 +110,41 @@ export function FixtureCheckout({
             </button>
           </form>
 
-          {result ? (
-            <div
-              className={styles.result}
-              data-status={result.ok ? "success" : "failure"}
-              role="status"
-              aria-live="polite"
-            >
-              <strong>{result.ok ? "Intent created" : "Checkout blocked"}</strong>
-              <p>
-                {result.ok
-                  ? `Fixture receipt ${result.intentId}`
-                  : `${result.code}: the request did not create a payment intent.`}
-              </p>
-              <button
-                className={styles.reset}
-                type="button"
-                onClick={() => {
-                  setPendingIntentId("");
-                  setSubmission({ status: "idle" });
-                }}
+          {/* The slot is always rendered with reserved space so showing a
+              result (or an error) never shifts the form above it. */}
+          <div className={styles.resultSlot} role="status" aria-live="polite">
+            {result ? (
+              <div
+                className={styles.result}
+                data-status={result.ok ? "success" : "failure"}
               >
-                Reset fixture
-              </button>
-            </div>
-          ) : null}
+                <strong>
+                  {result.ok ? "Intent created" : "Checkout blocked"}
+                </strong>
+                <p>
+                  {result.ok
+                    ? `Fixture receipt ${result.intentId}`
+                    : `${result.code}: the request did not create a payment intent.`}
+                </p>
+                <button
+                  className={styles.reset}
+                  type="button"
+                  onClick={() => {
+                    setPendingIntentId("");
+                    setSubmission({ status: "idle" });
+                  }}
+                >
+                  Reset fixture
+                </button>
+              </div>
+            ) : (
+              <p className={styles.resultPlaceholder}>
+                {submission.status === "submitting"
+                  ? "Submitting…"
+                  : "Result appears here after submission."}
+              </p>
+            )}
+          </div>
 
           <p className={styles.build}>
             mode=FIXTURE · variant={variant} · build={buildSha}

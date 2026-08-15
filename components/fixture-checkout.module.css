@@ -149,8 +149,24 @@
   opacity: 0.66;
 }
 
-.result {
+.resultSlot {
   margin-top: 1.5rem;
+  min-height: 9.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.resultPlaceholder {
+  margin: 0;
+  padding: 0.85rem 0;
+  color: rgba(17, 36, 43, 0.72);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
+.result {
   border-left: 4px solid var(--fixture-veto);
   padding: 0.85rem 1rem;
   background: rgba(217, 70, 56, 0.08);
@@ -177,7 +193,7 @@
 
 .build {
   margin-top: 2.2rem;
-  color: rgba(17, 36, 43, 0.5);
+  color: rgba(17, 36, 43, 0.82);
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.72rem;
   overflow-wrap: anywhere;

@@ -32,9 +32,6 @@ REPLAY_VERIFYING ── Replay retests the EXACT candidate build. Anything less 
 HUMAN_VERIFYING ─── A fresh, disjoint Terac cohort attempts the repaired flow.
         │            Completion must beat the predeclared threshold and lift.
         ▼
-RELEASE_DECISION ── The certified evidence bundle enters the Band room. An explicit
-        │            approved/vetoed verdict is the only door to settlement.
-        ▼
 AWAITING_PAYMENT ── Only now does Stripe reveal the payment link. Signed webhook,
         │            authoritative re-fetch, idempotent delivery. Pay once, deliver once.
         ▼
@@ -52,7 +49,6 @@ Every transition is an append-only journal entry naming the actor, exact build S
 | Evidence compiler | Pioneer open-weight model + Talos policy | Extract evidence-backed bug facts; intersect them with a predeclared repository manifest and hash the resulting repair contract |
 | Repair engineer | Talos inside Superserve | Execute only the accepted specification; cannot approve its own candidate |
 | Human witness | Fresh Terac cohort | Prove the declared task-completion outcome improved |
-| Release chamber | Band | Carry the certified evidence bundle and the explicit verdict that gates settlement |
 | Treasurer | Stripe | Reveal the one organizer-approved Payment Link only after both proofs |
 
 ---
@@ -105,16 +101,6 @@ Stripe is the company's financial constitution:
 - A **durable dedup inbox**: replay the same event twice and delivery count stays exactly one.
 - Revenue accounting is honest by construction: only livemode payments matching the exact contract amount count (`isCountableLiveRevenue`); test and demo data are structurally excluded and visibly labeled.
 
-### 🎛️ Band — the room where the company actually decides
-
-Coordination in Talos is not a group chat that displays what already happened — **Band is where the release decision is made, and nothing ships without it.**
-
-- When a candidate is certified, the release request enters the Band room as a **structured, evidence-linked message**: the certification proof, the patch receipt, and the holdout receipt, each pointing to its provider evidence — a Replay report, a commit SHA, a Terac study ID, a Stripe event.
-- The decision comes back as an explicit verdict — `approved` or `vetoed`, with a reason code — and it is a **genuinely blocking handoff**: the state machine waits on that verdict; delivery and payment are unreachable until it exists. Remove the room and the company doesn't lose a dashboard — it loses the ability to release at all.
-- Because every handoff between departments flows through Band with its evidence attached, the Band transcript doubles as the company's **append-only audit log**. The decision journal judges inspect *is* the coordination layer — one system, no reconciliation gap between "what the agents said" and "what the company did."
-
-Separation of powers needs a chamber where the powers meet. Band is that chamber.
-
 ---
 
 ## The core contract: what Talos will not do
@@ -147,7 +133,9 @@ Both paths are conspicuously labeled `FIXTURE`; neither touches Stripe or repres
 - Stripe has an implemented raw-body signature boundary, authoritative Checkout Session re-fetch, registered Payment Link ID check, `client_reference_id` order reconciliation, and durable provider-inbox deduplication.
 - Pioneer is load-bearing in the domain flow: the live-client result has a tested bridge into the canonical `PATCH_SPEC_COMPILED` event, while Talos—not Pioneer—owns file scope and safety policy. A run is not a live Pioneer run unless a real API key and provider receipt are present; without them, the structured result is labeled fixture/demo evidence.
 - The bounded Superserve lifecycle/exec client is implemented and fail-closed; the higher-level repair orchestrator remains a separate contract. It has not been live-tested and cannot qualify as live Superserve usage until issued credentials produce a real sanitized provider receipt.
-- Replay and Terac also require real credentials and receipts before Talos labels their evidence `LIVE`; the UI does not fabricate provider evidence.
+- Replay offers no public API today (confirmed with Replay at the event); evidence is ingested through Replay-hosted report and recording URLs, bugs filed to this repo's GitHub Issues by Replay's own integration, automatic retests on new deployments, and a token-verified webhook inbox at `/api/webhooks/replay`. Every Replay claim links to the artifact Replay hosts.
+- Terac live credentials are configured and the baseline human study (TAL-0001 · baseline · checkout) was launched during the event with real general-population participants; raw counts land in the ledger as they are approved.
+- Band and Render adapters are typed contracts only — deliberately out of scope for this build; neither is claimed as wired, and nothing in the release path depends on them.
 
 ## Verify it yourself
 
@@ -172,6 +160,6 @@ More: [Threat model](docs/THREAT_MODEL.md) · [Sponsor integration checklist](do
 
 ## The close
 
-> **The agent repaired it. Replay proved the software. Fresh people proved the outcome. Stripe proved somebody paid.**
+> **The agent repaired it. Replay proved the software. Fresh people proved the outcome. The ledger proves every step.**
 
 Built at the Zero-Human Company Hackathon by Terac — San Francisco, August 15, 2026.
