@@ -1,6 +1,7 @@
 import { DomainInvariantError, invariant } from "./errors";
 import {
   assertOrderInvariants,
+  assertValidPatchSpec,
   assertValidBaseline,
   assertValidHoldout,
   hasCertifiableEvidence,
@@ -9,12 +10,15 @@ import {
   isReplayStrictlyClean,
   paymentMatchesMode,
 } from "./policy";
+import { normalizeRepositoryFilePath } from "./patch-spec";
 import type {
   CloseReason,
   Command,
   DomainEvent,
   TalosOrder,
   OrderState,
+  PatchSpecEvidence,
+  PatchSpec,
   Reduction,
   RepairTrigger,
   ReplaySnapshot,
@@ -43,18 +47,81 @@ function openBugIds(order: TalosOrder): string[] {
   return source?.open.map((bug) => bug.bugId) ?? [];
 }
 
+function patchSpecEvidence(order: TalosOrder): PatchSpecEvidence {
+  const snapshot =
+    order.replay.verificationSnapshot ?? order.replay.initialSnapshot;
+  invariant(
+    snapshot,
+    "PATCH_SPEC_REPLAY_EVIDENCE_MISSING",
+    "Patch specification requires authoritative Replay evidence",
+  );
+  const replayBugIds =
+    snapshot.open.length > 0
+      ? snapshot.open.map((bug) => bug.bugId)
+      : snapshot.fixed.map((bug) => bug.bugId);
+  invariant(
+    replayBugIds.length > 0,
+    "PATCH_SPEC_REPLAY_BUGS_MISSING",
+    "Patch specification requires at least one Replay bug",
+  );
+  return {
+    replayProjectId: snapshot.projectId,
+    replaySnapshotObservedAt: snapshot.observedAt,
+    replayObservedBuildSha: snapshot.observedBuildSha,
+    replayBugIds,
+    ...(order.human.holdout
+      ? { humanStudyId: order.human.holdout.studyId }
+      : {}),
+  };
+}
+
+function patchSpecCommand(
+  order: TalosOrder,
+  attempt: 1 | 2,
+  trigger: RepairTrigger,
+): Command {
+  const evidence = patchSpecEvidence(order);
+  return {
+    type: "COMPILE_PATCH_SPEC",
+    idempotencyKey: `${order.id}:patch-spec:${attempt}:${evidence.replaySnapshotObservedAt}`,
+    orderId: order.id,
+    attempt,
+    trigger,
+    evidence,
+  };
+}
+
+function sealPatchSpec(spec: PatchSpec): PatchSpec {
+  return {
+    ...spec,
+    evidence: {
+      ...spec.evidence,
+      replayBugIds: [...spec.evidence.replayBugIds],
+    },
+    changes: spec.changes.map((change) => ({ ...change })),
+  };
+}
+
 function repairCommand(
   order: TalosOrder,
   attempt: 1 | 2,
   trigger: RepairTrigger,
 ): Command {
+  const patchSpec = order.repair.patchSpec;
+  invariant(
+    patchSpec,
+    "PATCH_SPEC_REQUIRED",
+    "Repair execution requires a validated Pioneer patch specification",
+  );
   return {
     type: "RUN_REPAIR",
     idempotencyKey: `${order.id}:repair:${attempt}`,
     orderId: order.id,
     attempt,
     trigger,
-    replayBugIds: openBugIds(order),
+    replayBugIds: [...patchSpec.evidence.replayBugIds],
+    patchSpecId: patchSpec.specId,
+    patchSpecSha256: patchSpec.specSha256,
   };
 }
 
@@ -156,14 +223,57 @@ function applyEvent(
         };
       }
 
-      const patching: TalosOrder = {
+      invariant(
+        event.replay.open.length > 0,
+        "REPAIR_WITHOUT_REPLAY_BUG",
+        "A requested repair must be grounded in an open Replay bug",
+      );
+      const specifying: TalosOrder = {
         ...diagnosed,
+        state: "SPECIFYING",
+        repair: { attempt: 1, trigger: "INITIAL_DIAGNOSIS" },
+      };
+      return {
+        order: specifying,
+        commands: [
+          patchSpecCommand(specifying, 1, "INITIAL_DIAGNOSIS"),
+        ],
+      };
+    }
+
+    case "PATCH_SPEC_COMPILED": {
+      expectState(order, event, ["SPECIFYING"]);
+      const trigger = order.repair.trigger;
+      invariant(
+        trigger,
+        "PATCH_SPEC_TRIGGER_MISSING",
+        "Active specification phase requires a repair trigger",
+      );
+      assertValidPatchSpec(event.spec, {
+        attempt: order.repair.attempt as 1 | 2,
+        trigger,
+        evidence: patchSpecEvidence(order),
+        repositoryUrl: order.contract.repositoryUrl,
+      });
+      const sealedSpec = sealPatchSpec(event.spec);
+      const patching: TalosOrder = {
+        ...order,
         state: "PATCHING",
-        repair: { attempt: 1 },
+        repair: {
+          attempt: order.repair.attempt,
+          trigger,
+          patchSpec: sealedSpec,
+        },
       };
       return {
         order: patching,
-        commands: [repairCommand(patching, 1, "INITIAL_DIAGNOSIS")],
+        commands: [
+          repairCommand(
+            patching,
+            order.repair.attempt as 1 | 2,
+            trigger,
+          ),
+        ],
       };
     }
 
@@ -178,11 +288,12 @@ function applyEvent(
       const attempt = (order.repair.attempt + 1) as 2;
       const retrying: TalosOrder = {
         ...order,
-        repair: { ...order.repair, attempt },
+        state: "SPECIFYING",
+        repair: { attempt, trigger: "REPAIR_RETRY" },
       };
       return {
         order: retrying,
-        commands: [repairCommand(retrying, attempt, "REPAIR_RETRY")],
+        commands: [patchSpecCommand(retrying, attempt, "REPAIR_RETRY")],
       };
     }
 
@@ -204,6 +315,32 @@ function applyEvent(
           event.candidate.buildIdentityUrl.length > 0,
         "CANDIDATE_IDENTITY_MISSING",
         "Candidate requires preview and build identity URLs",
+      );
+      const patchSpec = order.repair.patchSpec;
+      invariant(
+        patchSpec,
+        "PATCH_SPEC_REQUIRED",
+        "Candidate deployment requires the active Pioneer patch specification",
+      );
+      const authorizedFiles = new Set(
+        patchSpec.changes.map((change) => change.filePath),
+      );
+      const candidateFiles = event.candidate.changedFiles.map((file) => {
+        try {
+          return normalizeRepositoryFilePath(file);
+        } catch {
+          return undefined;
+        }
+      });
+      invariant(
+        candidateFiles.length > 0 &&
+          candidateFiles.every(
+            (file): file is string =>
+              file !== undefined && authorizedFiles.has(file),
+          ) &&
+          new Set(candidateFiles).size === candidateFiles.length,
+        "CANDIDATE_OUTSIDE_PATCH_SPEC",
+        "Candidate changed files must be authorized by the immutable patch specification",
       );
 
       const bugIds = openBugIds(order);
@@ -232,6 +369,8 @@ function applyEvent(
           state: "REPLAY_VERIFYING",
           repair: {
             attempt: order.repair.attempt,
+            trigger: order.repair.trigger,
+            patchSpec,
             candidate: event.candidate,
           },
           replay: {
@@ -300,14 +439,16 @@ function applyEvent(
           };
         }
         const attempt = (order.repair.attempt + 1) as 2;
-        const patching: TalosOrder = {
+        const specifying: TalosOrder = {
           ...synced,
-          state: "PATCHING",
-          repair: { ...synced.repair, attempt },
+          state: "SPECIFYING",
+          repair: { attempt, trigger: "REPLAY_DIRTY" },
         };
         return {
-          order: patching,
-          commands: [repairCommand(patching, attempt, "REPLAY_DIRTY")],
+          order: specifying,
+          commands: [
+            patchSpecCommand(specifying, attempt, "REPLAY_DIRTY"),
+          ],
         };
       }
 
@@ -366,15 +507,19 @@ function applyEvent(
         };
       }
       const attempt = (order.repair.attempt + 1) as 2;
-      const patching: TalosOrder = {
+      const specifying: TalosOrder = {
         ...withHoldout,
-        state: "PATCHING",
-        repair: { ...withHoldout.repair, attempt },
+        state: "SPECIFYING",
+        repair: { attempt, trigger: "HUMAN_HOLDOUT_FAILED" },
       };
       return {
-        order: patching,
+        order: specifying,
         commands: [
-          repairCommand(patching, attempt, "HUMAN_HOLDOUT_FAILED"),
+          patchSpecCommand(
+            specifying,
+            attempt,
+            "HUMAN_HOLDOUT_FAILED",
+          ),
         ],
       };
     }
@@ -479,6 +624,7 @@ function applyEvent(
       expectState(order, event, [
         "DRAFT",
         "DIAGNOSING",
+        "SPECIFYING",
         "PATCHING",
         "REPLAY_VERIFYING",
         "HUMAN_VERIFYING",
@@ -498,6 +644,7 @@ function applyEvent(
     case "PROVIDER_ERROR_RECORDED": {
       expectState(order, event, [
         "DIAGNOSING",
+        "SPECIFYING",
         "PATCHING",
         "REPLAY_VERIFYING",
         "HUMAN_VERIFYING",

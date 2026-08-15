@@ -2,6 +2,7 @@ export * from "./band";
 export * from "./contracts";
 export * from "./core";
 export * from "./fixture";
+export * from "./pioneer";
 export * from "./receipts";
 export * from "./render-workflow";
 export * from "./replay";

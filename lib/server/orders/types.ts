@@ -4,6 +4,7 @@ const runModeSchema = z.enum(["LIVE", "TEST", "DEMO"]);
 const orderStateSchema = z.enum([
   "DRAFT",
   "DIAGNOSING",
+  "SPECIFYING",
   "PATCHING",
   "REPLAY_VERIFYING",
   "HUMAN_VERIFYING",
@@ -46,6 +47,9 @@ export const talosOrderRowSchema = z.object({
   minimum_participants: z.number().int().positive(),
   minimum_completion_rate: numericRate.pipe(z.number().min(0).max(1)),
   minimum_absolute_lift: numericRate.pipe(z.number().gt(0).max(1)),
+  patch_spec_id: nullableString,
+  patch_spec_sha256: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+  patch_spec_model_id: nullableString,
   candidate_sha: nullableString,
   candidate_preview_url: z.string().url().nullable(),
   replay_project_id: nullableString,
@@ -121,6 +125,9 @@ export interface TalosOrderReadModel {
     };
     repair: {
       attempt: number;
+      patchSpecId: string | null;
+      patchSpecSha256: string | null;
+      patchSpecModelId: string | null;
       candidateSha: string | null;
       candidatePreviewUrl: string | null;
     };

@@ -1,4 +1,5 @@
 import {
+  computePatchSpecSha256,
   createDraftOrder,
   reduce,
   type CandidateBuild,
@@ -6,6 +7,7 @@ import {
   type TalosOrder,
   type HumanStudyResult,
   type PaymentEvidence,
+  type PatchSpec,
   type ReleaseCertificateRef,
   type ReplayBugEvidence,
   type ReplaySnapshot,
@@ -183,6 +185,58 @@ export function makePayment(
   };
 }
 
+export function makePatchSpec(
+  order: TalosOrder,
+  overrides: Partial<PatchSpec> = {},
+): PatchSpec {
+  const snapshot =
+    order.replay.verificationSnapshot ?? order.replay.initialSnapshot;
+  if (!snapshot) throw new Error("Patch spec fixture requires Replay evidence");
+  const replayBugIds =
+    snapshot.open.length > 0
+      ? snapshot.open.map((bug) => bug.bugId)
+      : snapshot.fixed.map((bug) => bug.bugId);
+  const attempt = order.repair.attempt as 1 | 2;
+  const trigger = order.repair.trigger ?? "INITIAL_DIAGNOSIS";
+  const { specSha256: suppliedHash, ...remainingOverrides } = overrides;
+  const unhashed: Omit<PatchSpec, "specSha256"> = {
+    specId: `pioneer_spec_${attempt}`,
+    compilerProvider: "PIONEER",
+    modelKind: "OPEN_WEIGHT",
+    modelId: "fastino/gliner2-large-v1",
+    attempt,
+    trigger,
+    bugClass: "FORM_SUBMISSION",
+    confidence: 0.94,
+    evidence: {
+      replayProjectId: snapshot.projectId,
+      replaySnapshotObservedAt: snapshot.observedAt,
+      replayObservedBuildSha: snapshot.observedBuildSha,
+      replayBugIds,
+      ...(order.human.holdout
+        ? { humanStudyId: order.human.holdout.studyId }
+        : {}),
+    },
+    scope: {
+      resolverId: "fixture-route-manifest-v1",
+      repositoryUrl: order.contract.repositoryUrl,
+      resolvedAtSha: snapshot.observedBuildSha,
+    },
+    changes: [
+      {
+        filePath: "app/request-form.tsx",
+        intent: "Repair the evidence-backed form submission state transition",
+      },
+    ],
+    compiledAt: "2026-08-15T11:10:00.000Z",
+    ...remainingOverrides,
+  };
+  return {
+    ...unhashed,
+    specSha256: suppliedHash ?? computePatchSpecSha256(unhashed),
+  };
+}
+
 type DomainEventType = DomainEvent["type"];
 type DomainEventOfType<T extends DomainEventType> = Extract<
   DomainEvent,
@@ -206,7 +260,7 @@ export function makeDiagnosingOrder(mode: RunMode = "LIVE"): TalosOrder {
   return reduce(draft, event({ type: "INTAKE_ACCEPTED" })).order;
 }
 
-export function makePatchingOrder(mode: RunMode = "LIVE"): TalosOrder {
+export function makeSpecifyingOrder(mode: RunMode = "LIVE"): TalosOrder {
   const diagnosing = makeDiagnosingOrder(mode);
   return reduce(
     diagnosing,
@@ -216,6 +270,14 @@ export function makePatchingOrder(mode: RunMode = "LIVE"): TalosOrder {
       baseline: makeBaseline(),
       repairRequired: true,
     }),
+  ).order;
+}
+
+export function makePatchingOrder(mode: RunMode = "LIVE"): TalosOrder {
+  const specifying = makeSpecifyingOrder(mode);
+  return reduce(
+    specifying,
+    event({ type: "PATCH_SPEC_COMPILED", spec: makePatchSpec(specifying) }),
   ).order;
 }
 

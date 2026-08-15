@@ -4,6 +4,7 @@ import { createAdminClient } from "@insforge/sdk";
 import { z } from "zod";
 
 import { parseSingleOrderRow, serializeTalosOrder } from "./serializer";
+import { OrderLedgerDataCorruptionError } from "./public-events";
 import type { TalosOrderReadModel } from "./types";
 
 const ORDER_COLUMNS = [
@@ -24,6 +25,9 @@ const ORDER_COLUMNS = [
   "minimum_participants",
   "minimum_completion_rate",
   "minimum_absolute_lift",
+  "patch_spec_id",
+  "patch_spec_sha256",
+  "patch_spec_model_id",
   "candidate_sha",
   "candidate_preview_url",
   "replay_project_id",
@@ -51,6 +55,12 @@ const EVENT_COLUMNS = [
   "payload",
 ].join(",");
 
+const orderReadConfirmationSchema = z.object({
+  id: z.string().uuid(),
+  version: z.number().int().nonnegative(),
+  updated_at: z.string().datetime({ offset: true }),
+});
+
 const environmentSchema = z.object({
   INSFORGE_URL: z.string().trim().url().startsWith("https://"),
   INSFORGE_API_KEY: z.string().trim().min(1),
@@ -64,6 +74,20 @@ export class OrderRepositoryUnavailableError extends Error {
   constructor(readonly reason: RepositoryFailureReason) {
     super("Talos order repository is unavailable");
     this.name = "OrderRepositoryUnavailableError";
+  }
+}
+
+export class OrderRepositoryDataCorruptionError extends Error {
+  constructor() {
+    super("Talos order repository returned invalid data");
+    this.name = "OrderRepositoryDataCorruptionError";
+  }
+}
+
+export class OrderRepositoryInconsistentSnapshotError extends Error {
+  constructor() {
+    super("Talos order repository snapshot changed during the read");
+    this.name = "OrderRepositoryInconsistentSnapshotError";
   }
 }
 
@@ -89,34 +113,75 @@ export function createInsForgeOrderRepository(
   return {
     async findByPublicReference(reference) {
       try {
-        const orderResult = await client.database
-          .from("talos_orders")
-          .select(ORDER_COLUMNS)
-          .eq("public_reference", reference)
-          .maybeSingle();
+        for (let readAttempt = 0; readAttempt < 2; readAttempt += 1) {
+          const orderResult = await client.database
+            .from("talos_orders")
+            .select(ORDER_COLUMNS)
+            .eq("public_reference", reference)
+            .maybeSingle();
 
-        if (orderResult.error) {
-          throw new OrderRepositoryUnavailableError("DATABASE_UNAVAILABLE");
+          if (orderResult.error) {
+            throw new OrderRepositoryUnavailableError("DATABASE_UNAVAILABLE");
+          }
+
+          const order = parseSingleOrderRow(orderResult.data);
+          if (!order) {
+            return null;
+          }
+
+          const eventResult = await client.database
+            .from("talos_order_events")
+            .select(EVENT_COLUMNS)
+            .eq("order_id", order.id)
+            .order("sequence", { ascending: true });
+
+          if (eventResult.error) {
+            throw new OrderRepositoryUnavailableError("DATABASE_UNAVAILABLE");
+          }
+
+          const confirmationResult = await client.database
+            .from("talos_orders")
+            .select("id,version,updated_at")
+            .eq("public_reference", reference)
+            .maybeSingle();
+
+          if (confirmationResult.error) {
+            throw new OrderRepositoryUnavailableError("DATABASE_UNAVAILABLE");
+          }
+
+          const confirmation = orderReadConfirmationSchema.nullable().parse(
+            confirmationResult.data,
+          );
+          const snapshotIsStable =
+            confirmation?.id === order.id &&
+            confirmation.version === order.version &&
+            confirmation.updated_at === order.updated_at;
+
+          if (!snapshotIsStable) {
+            if (readAttempt === 0) {
+              continue;
+            }
+            throw new OrderRepositoryInconsistentSnapshotError();
+          }
+
+          return serializeTalosOrder(order, eventResult.data ?? []);
         }
 
-        const order = parseSingleOrderRow(orderResult.data);
-        if (!order) {
-          return null;
-        }
-
-        const eventResult = await client.database
-          .from("talos_order_events")
-          .select(EVENT_COLUMNS)
-          .eq("order_id", order.id)
-          .order("sequence", { ascending: true });
-
-        if (eventResult.error) {
-          throw new OrderRepositoryUnavailableError("DATABASE_UNAVAILABLE");
-        }
-
-        return serializeTalosOrder(order, eventResult.data ?? []);
+        throw new OrderRepositoryInconsistentSnapshotError();
       } catch (error) {
         if (error instanceof OrderRepositoryUnavailableError) {
+          throw error;
+        }
+        if (
+          error instanceof z.ZodError ||
+          error instanceof OrderLedgerDataCorruptionError
+        ) {
+          throw new OrderRepositoryDataCorruptionError();
+        }
+        if (error instanceof OrderRepositoryDataCorruptionError) {
+          throw error;
+        }
+        if (error instanceof OrderRepositoryInconsistentSnapshotError) {
           throw error;
         }
         throw new OrderRepositoryUnavailableError("DATABASE_UNAVAILABLE");

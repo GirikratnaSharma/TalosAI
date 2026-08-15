@@ -20,6 +20,7 @@ export const receiptArtifactSchema = z
       "snapshot",
       "bug",
       "patch",
+      "patch_spec",
       "cohort",
       "certification",
       "payment",
@@ -85,6 +86,8 @@ export const SUPERSERVE_OPERATIONS = [
   "destroy_sandbox",
 ] as const;
 
+export const PIONEER_OPERATIONS = ["compile_patch_spec"] as const;
+
 export const TERAC_OPERATIONS = [
   "run_baseline",
   "run_holdout",
@@ -115,6 +118,10 @@ export const superserveReceiptSchema = makeReceiptSchema(
   "superserve",
   SUPERSERVE_OPERATIONS,
 );
+export const pioneerReceiptSchema = makeReceiptSchema(
+  "pioneer",
+  PIONEER_OPERATIONS,
+);
 export const teracReceiptSchema = makeReceiptSchema("terac", TERAC_OPERATIONS);
 export const stripeReceiptSchema = makeReceiptSchema(
   "stripe",
@@ -129,6 +136,7 @@ export const bandReceiptSchema = makeReceiptSchema("band", BAND_OPERATIONS);
 export const providerReceiptSchema = z.union([
   replayReceiptSchema,
   superserveReceiptSchema,
+  pioneerReceiptSchema,
   teracReceiptSchema,
   stripeReceiptSchema,
   renderReceiptSchema,
@@ -137,6 +145,7 @@ export const providerReceiptSchema = z.union([
 
 export type ReplayReceipt = z.infer<typeof replayReceiptSchema>;
 export type SuperserveReceipt = z.infer<typeof superserveReceiptSchema>;
+export type PioneerReceipt = z.infer<typeof pioneerReceiptSchema>;
 export type TeracReceipt = z.infer<typeof teracReceiptSchema>;
 export type StripeReceipt = z.infer<typeof stripeReceiptSchema>;
 export type RenderReceipt = z.infer<typeof renderReceiptSchema>;
@@ -146,6 +155,7 @@ export type ProviderReceipt = z.infer<typeof providerReceiptSchema>;
 export interface ProviderOperationMap {
   replay: (typeof REPLAY_OPERATIONS)[number];
   superserve: (typeof SUPERSERVE_OPERATIONS)[number];
+  pioneer: (typeof PIONEER_OPERATIONS)[number];
   terac: (typeof TERAC_OPERATIONS)[number];
   stripe: (typeof STRIPE_OPERATIONS)[number];
   render: (typeof RENDER_OPERATIONS)[number];

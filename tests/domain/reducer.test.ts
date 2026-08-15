@@ -20,8 +20,10 @@ import {
   makeHumanVerifyingOrder,
   makePatchingOrder,
   makePayment,
+  makePatchSpec,
   makeReplaySnapshot,
   makeReplayVerifyingOrder,
+  makeSpecifyingOrder,
 } from "./fixtures";
 
 function expectDomainCode(operation: () => unknown, code: string): void {
@@ -48,8 +50,17 @@ function makeAttemptTwoVerifyingOrder(): TalosOrder {
     }),
   ).order;
 
-  return reduce(
+  const patching = reduce(
     dirty,
+    event({
+      id: "event_patch_spec_compiled_2",
+      type: "PATCH_SPEC_COMPILED",
+      spec: makePatchSpec(dirty),
+    }),
+  ).order;
+
+  return reduce(
+    patching,
     event({
       id: "event_candidate_deployed_2",
       type: "CANDIDATE_DEPLOYED",
@@ -103,7 +114,7 @@ describe("Talos reducer", () => {
     );
   });
 
-  it("starts the first repair from organic Replay evidence", () => {
+  it("requires Pioneer to compile a spec from organic Replay evidence", () => {
     const diagnosing = makeDiagnosingOrder();
     const result = reduce(
       diagnosing,
@@ -115,14 +126,37 @@ describe("Talos reducer", () => {
       }),
     );
 
-    expect(result.order.state).toBe("PATCHING");
+    expect(result.order.state).toBe("SPECIFYING");
     expect(result.order.repair.attempt).toBe(1);
+    expect(result.commands).toEqual([
+      expect.objectContaining({
+        type: "COMPILE_PATCH_SPEC",
+        attempt: 1,
+        trigger: "INITIAL_DIAGNOSIS",
+        evidence: expect.objectContaining({ replayBugIds: ["bug_001"] }),
+      }),
+    ]);
+  });
+
+  it("runs repair only after an immutable evidence-bound spec is accepted", () => {
+    const specifying = makeSpecifyingOrder();
+    const spec = makePatchSpec(specifying);
+    const result = reduce(
+      specifying,
+      event({ type: "PATCH_SPEC_COMPILED", spec }),
+    );
+
+    expect(result.order.state).toBe("PATCHING");
+    expect(result.order.repair.patchSpec).toEqual(spec);
+    expect(result.order.repair.patchSpec).not.toBe(spec);
     expect(result.commands).toEqual([
       expect.objectContaining({
         type: "RUN_REPAIR",
         attempt: 1,
         trigger: "INITIAL_DIAGNOSIS",
         replayBugIds: ["bug_001"],
+        patchSpecId: spec.specId,
+        patchSpecSha256: spec.specSha256,
       }),
     ]);
   });
@@ -189,13 +223,23 @@ describe("Talos reducer", () => {
       first,
       event({ type: "REPAIR_FAILED", reason: "build failed" }),
     );
+    expect(retry.order.state).toBe("SPECIFYING");
     expect(retry.order.repair.attempt).toBe(2);
     expect(retry.commands[0]).toEqual(
-      expect.objectContaining({ type: "RUN_REPAIR", attempt: 2 }),
+      expect.objectContaining({ type: "COMPILE_PATCH_SPEC", attempt: 2 }),
     );
 
-    const exhausted = reduce(
+    const secondPatching = reduce(
       retry.order,
+      event({
+        id: "event_patch_spec_retry",
+        type: "PATCH_SPEC_COMPILED",
+        spec: makePatchSpec(retry.order),
+      }),
+    ).order;
+
+    const exhausted = reduce(
+      secondPatching,
       event({
         id: "event_repair_failed_again",
         type: "REPAIR_FAILED",
@@ -280,8 +324,16 @@ describe("Talos reducer", () => {
         }),
       }),
     );
-    expect(retry.order.state).toBe("PATCHING");
+    expect(retry.order.state).toBe("SPECIFYING");
     expect(retry.order.repair.attempt).toBe(2);
+    expect(retry.order.repair.patchSpec).toBeUndefined();
+    expect(retry.commands[0]).toEqual(
+      expect.objectContaining({
+        type: "COMPILE_PATCH_SPEC",
+        trigger: "REPLAY_DIRTY",
+        evidence: expect.objectContaining({ replayBugIds: ["bug_retry"] }),
+      }),
+    );
 
     const second = makeAttemptTwoVerifyingOrder();
     const exhausted = reduce(
@@ -363,12 +415,16 @@ describe("Talos reducer", () => {
         }),
       }),
     );
-    expect(result.order.state).toBe("PATCHING");
+    expect(result.order.state).toBe("SPECIFYING");
     expect(result.order.repair.attempt).toBe(2);
     expect(result.commands[0]).toEqual(
       expect.objectContaining({
-        type: "RUN_REPAIR",
+        type: "COMPILE_PATCH_SPEC",
         trigger: "HUMAN_HOLDOUT_FAILED",
+        evidence: expect.objectContaining({
+          replayBugIds: ["bug_001"],
+          humanStudyId: "terac_holdout_001",
+        }),
       }),
     );
   });

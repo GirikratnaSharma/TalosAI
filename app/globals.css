@@ -536,6 +536,35 @@ a {
   text-transform: uppercase;
 }
 
+.compiler-rule {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 12px 7px 0;
+  padding: 9px 11px;
+  color: #bcd2ff;
+  background: rgba(117, 167, 255, 0.08);
+  border: 1px solid rgba(117, 167, 255, 0.28);
+}
+
+.compiler-rule > svg {
+  flex: 0 0 auto;
+}
+
+.compiler-rule span {
+  display: grid;
+  gap: 2px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.49rem;
+  line-height: 1.4;
+}
+
+.compiler-rule strong {
+  font-size: 0.48rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .ledger-list {
   position: relative;
   display: grid;
@@ -655,6 +684,17 @@ a {
 
 .ledger-row--blocked .ledger-state {
   color: var(--orange-light);
+}
+
+.ledger-row--compiler .ledger-row-button {
+  border-left: 3px solid var(--blue);
+  background: rgba(117, 167, 255, 0.045);
+}
+
+.ledger-row--compiler .ledger-sequence,
+.ledger-row--compiler .ledger-state {
+  color: #bcd2ff;
+  border-color: rgba(117, 167, 255, 0.55);
 }
 
 .ledger-row--verified .ledger-state,
@@ -878,7 +918,7 @@ a {
 
 .provider-footer {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   border-top: 1px solid var(--night-line);
 }
 
@@ -1225,7 +1265,7 @@ a {
     grid-template-columns: 1fr 1fr;
   }
 
-  .provider-footer > div:nth-child(2) {
+  .provider-footer > div:nth-child(2n) {
     border-right: 0;
   }
 

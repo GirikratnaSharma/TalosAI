@@ -77,3 +77,27 @@ export interface SuperserveAdapter extends AdapterIdentity<"superserve"> {
     >
   >;
 }
+
+// Public low-level provider boundary. This is intentionally separate from the
+// higher-level repair orchestration contract above: callers can exercise the
+// documented Superserve lifecycle without implying that runRepair is wired.
+export {
+  createSuperserveClientFromEnv,
+  sanitizeSuperserveReceipt,
+  SuperserveHttpClient,
+  SuperserveProviderError,
+} from "../providers/superserve";
+export type {
+  CreateSuperserveSandboxInput,
+  RunSuperserveCommandInput,
+  SuperserveCommandOutput as SuperserveHttpCommandOutput,
+  SuperserveCreateReceipt,
+  SuperserveDestroyReceipt,
+  SuperserveHttpClientOptions,
+  SuperserveOperationResult,
+  SuperservePauseReceipt,
+  SuperserveResumeReceipt,
+  SuperserveRunReceipt,
+  SuperserveSandboxRef,
+  SuperserveSanitizedReceipt,
+} from "../providers/superserve";

@@ -23,6 +23,7 @@ export interface CommandOutbox {
   claimNext(): Promise<{ id: string; command: Command } | null>;
   complete(commandId: string, providerReceipt?: string): Promise<void>;
   retry(commandId: string, errorCode: string): Promise<void>;
+  fail(commandId: string, errorCode: string): Promise<void>;
 }
 
 export interface ReplayPort {

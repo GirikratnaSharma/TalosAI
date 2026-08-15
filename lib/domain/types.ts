@@ -1,6 +1,7 @@
 export const ORDER_STATES = [
   "DRAFT",
   "DIAGNOSING",
+  "SPECIFYING",
   "PATCHING",
   "REPLAY_VERIFYING",
   "HUMAN_VERIFYING",
@@ -106,6 +107,49 @@ export interface PaymentEvidence {
   confirmedAt: string;
 }
 
+export const SUPPORTED_PATCH_BUG_CLASSES = [
+  "CHECKOUT_INTERACTION",
+  "FORM_SUBMISSION",
+  "CLIENT_ROUTING",
+  "INTEGRATION_WIRING",
+] as const;
+
+export type SupportedPatchBugClass =
+  (typeof SUPPORTED_PATCH_BUG_CLASSES)[number];
+
+export interface PatchSpecEvidence {
+  replayProjectId: string;
+  replaySnapshotObservedAt: string;
+  replayObservedBuildSha: string;
+  replayBugIds: string[];
+  humanStudyId?: string;
+}
+
+export interface PatchSpecChange {
+  filePath: string;
+  intent: string;
+}
+
+export interface PatchSpec {
+  specId: string;
+  specSha256: string;
+  compilerProvider: "PIONEER";
+  modelKind: "OPEN_WEIGHT";
+  modelId: string;
+  attempt: 1 | 2;
+  trigger: RepairTrigger;
+  bugClass: SupportedPatchBugClass;
+  confidence: number;
+  evidence: PatchSpecEvidence;
+  scope: {
+    resolverId: string;
+    repositoryUrl: string;
+    resolvedAtSha: string;
+  };
+  changes: PatchSpecChange[];
+  compiledAt: string;
+}
+
 export interface TalosContract {
   criticalJourney: string;
   originalUrl: string;
@@ -145,6 +189,8 @@ export interface TalosOrder {
   };
   repair: {
     attempt: 0 | 1 | 2;
+    trigger?: RepairTrigger;
+    patchSpec?: PatchSpec;
     candidate?: CandidateBuild;
   };
   certificate?: ReleaseCertificateRef;
@@ -189,12 +235,22 @@ export type Command =
       participantCount: number;
     }
   | {
+      type: "COMPILE_PATCH_SPEC";
+      idempotencyKey: string;
+      orderId: string;
+      attempt: 1 | 2;
+      trigger: RepairTrigger;
+      evidence: PatchSpecEvidence;
+    }
+  | {
       type: "RUN_REPAIR";
       idempotencyKey: string;
       orderId: string;
       attempt: 1 | 2;
       trigger: RepairTrigger;
       replayBugIds: string[];
+      patchSpecId: string;
+      patchSpecSha256: string;
     }
   | {
       type: "MARK_REPLAY_BUGS_FIXED";
@@ -252,6 +308,7 @@ export type DomainEvent = EventMeta &
         repairRequired: boolean;
       }
     | { type: "REPAIR_FAILED"; reason: string }
+    | { type: "PATCH_SPEC_COMPILED"; spec: PatchSpec }
     | { type: "CANDIDATE_DEPLOYED"; candidate: CandidateBuild }
     | { type: "REPLAY_SYNCED"; snapshot: ReplaySnapshot }
     | { type: "HOLDOUT_COMPLETED"; result: HumanStudyResult }

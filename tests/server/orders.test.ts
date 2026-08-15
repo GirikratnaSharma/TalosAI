@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  OrderRepositoryDataCorruptionError,
+  OrderRepositoryInconsistentSnapshotError,
   OrderRepositoryUnavailableError,
   type TalosOrderRepository,
 } from "../../lib/server/orders/repository";
@@ -25,6 +27,10 @@ const orderRow = {
   minimum_participants: 25,
   minimum_completion_rate: "0.80",
   minimum_absolute_lift: "0.30",
+  patch_spec_id: "pioneer_spec_1",
+  patch_spec_sha256:
+    "a20ddbc71c231b47b5a74dba1d63daef513c86702f22299de9b24b856b41e336",
+  patch_spec_model_id: "fastino/gliner2-base-v1",
   candidate_sha: "def5678",
   candidate_preview_url: "https://preview.example.test",
   replay_project_id: "replay-12",
@@ -43,13 +49,13 @@ const event = (sequence: number, id: string) => ({
   id,
   order_id: orderRow.id,
   sequence,
-  event_type: `EVENT_${sequence}`,
-  provider: "replay",
+  event_type: "PAYMENT_LINK_RELEASED",
+  provider: "stripe",
   provider_event_id: `provider-${sequence}`,
   mode: "TEST",
   occurred_at: `2026-08-15T19:0${sequence}:00.000Z`,
   recorded_at: `2026-08-15T19:0${sequence}:01.000Z`,
-  payload: { sequence },
+  payload: { amountCents: 2500, currency: "usd", charged: false },
 });
 
 describe("Talos order read model", () => {
@@ -67,6 +73,47 @@ describe("Talos order read model", () => {
     expect(result.order.contract.minimumCompletionRate).toBe(0.8);
     expect(result.order.payment.status).toBe("LINK_RELEASED");
     expect(result.events.map(({ sequence }) => sequence)).toEqual([1, 2]);
+  });
+
+  it("projects public event evidence through an event-specific allowlist", () => {
+    const result = serializeTalosOrder(orderRow, [
+      {
+        ...event(1, "4950ab73-ac3f-4e9a-8af6-0c6778647cfa"),
+        payload: {
+          amountCents: 2500,
+          currency: "usd",
+          charged: false,
+          webhook: { customer_email: "private@example.test" },
+          providerResponse: { client_secret: "must-not-leak" },
+        },
+      },
+    ]);
+
+    expect(result.events[0]?.evidence).toEqual({
+      amountCents: 2500,
+      currency: "usd",
+      charged: false,
+    });
+  });
+
+  it("rejects unknown event types and invalid event/provider pairings", () => {
+    expect(() =>
+      serializeTalosOrder(orderRow, [
+        {
+          ...event(1, "4950ab73-ac3f-4e9a-8af6-0c6778647cfa"),
+          event_type: "ARBITRARY_WEBHOOK_RECEIVED",
+        },
+      ]),
+    ).toThrow("ledger data failed validation");
+
+    expect(() =>
+      serializeTalosOrder(orderRow, [
+        {
+          ...event(1, "4950ab73-ac3f-4e9a-8af6-0c6778647cfa"),
+          provider: "replay",
+        },
+      ]),
+    ).toThrow("ledger data failed validation");
   });
 
   it("rejects an event attached to a different order", () => {
@@ -115,6 +162,44 @@ describe("Talos order read model", () => {
         message: "The order ledger is temporarily unavailable.",
       },
     });
+  });
+
+  it.each([
+    new OrderRepositoryDataCorruptionError(),
+    new OrderRepositoryInconsistentSnapshotError(),
+  ])(
+    "does not demo-fallback for corrupt or inconsistent live reads",
+    async (repositoryError) => {
+      const repositoryFactory = (): TalosOrderRepository => ({
+        findByPublicReference: async () => {
+          throw repositoryError;
+        },
+      });
+
+      const result = await lookupOrder("TAL-D04", { repositoryFactory });
+      expect(result.status).toBe(503);
+    },
+  );
+
+  it("binds the demo's second repair attempt to its own Pioneer spec event", async () => {
+    const repositoryFactory = (): TalosOrderRepository => {
+      throw new OrderRepositoryUnavailableError("DATABASE_UNCONFIGURED");
+    };
+
+    const result = await lookupOrder("TAL-D04", { repositoryFactory });
+    expect(result.status).toBe(200);
+    if (result.status !== 200) throw new Error("Expected a demo order");
+
+    const compiledSpecs = result.body.events.filter(
+      ({ type }) => type === "PIONEER_PATCH_SPEC_COMPILED",
+    );
+    expect(compiledSpecs).toHaveLength(2);
+    expect(compiledSpecs.at(-1)?.evidence).toMatchObject({
+      attempt: 2,
+      specId: result.body.order.repair.patchSpecId,
+      specSha256: result.body.order.repair.patchSpecSha256,
+    });
+    expect(result.body.order.version).toBe(result.body.events.length);
   });
 
   it("returns not found without substituting demo data", async () => {

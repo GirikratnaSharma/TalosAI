@@ -8,6 +8,8 @@ import type {
 import type { ProviderOperationExecution } from "./core";
 import type { ReplayReceipt } from "./receipts";
 
+export * from "../providers/replay";
+
 export interface ReplayCreateProjectInput {
   readonly jobId: string;
   readonly name: string;
