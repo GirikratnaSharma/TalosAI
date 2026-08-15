@@ -59,7 +59,18 @@ export async function POST(request: Request) {
     }
 
     // Returning 503 intentionally asks Stripe to retry if the authoritative
-    // re-fetch or durable inbox is temporarily unavailable.
-    return Response.json({ error: "WEBHOOK_RETRY_REQUIRED" }, { status: 503 });
+    // re-fetch or durable inbox is temporarily unavailable. The failure is
+    // surfaced as a short operator-facing reason so a retrying provider (and
+    // the delivery log) shows which dependency degraded. No secret values are
+    // ever included.
+    const reason =
+      error instanceof Error
+        ? `${error.name}: ${error.message}`.slice(0, 300)
+        : "UNKNOWN_ERROR";
+    console.error("[talos] stripe webhook dependency failure", reason);
+    return Response.json(
+      { error: "WEBHOOK_RETRY_REQUIRED", reason },
+      { status: 503 },
+    );
   }
 }
