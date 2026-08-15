@@ -4,7 +4,7 @@ Talos is an autonomous repair company for one bounded class of broken React/Next
 
 **No proof. No payment.**
 
-[Open the Vercel deployment](https://talos-ai-abhinavggargs-projects.vercel.app) (currently protected by the team's Vercel Authentication; create a scoped Sharable Link before sending it to judges).
+[Open the deployed company ledger](https://talos-ai-ten.vercel.app)
 
 ## The company
 
@@ -32,8 +32,8 @@ The decision journal is the product—not a decorative multi-agent chat. Every s
 
 The repo includes a deterministic checkout bug so the full fail/retest story can be exercised without trusting an arbitrary customer repository:
 
-- [Seeded baseline](https://talos-ai-abhinavggargs-projects.vercel.app/fixtures/checkout?variant=baseline) sends a stale empty intent ID and must return `422 INTENT_ID_MISSING`.
-- [Repaired candidate](https://talos-ai-abhinavggargs-projects.vercel.app/fixtures/checkout?variant=candidate) sends the value created by the current submission and returns a fixture receipt.
+- [Seeded baseline](https://talos-ai-ten.vercel.app/fixtures/checkout?variant=baseline) sends a stale empty intent ID and must return `422 INTENT_ID_MISSING`.
+- [Repaired candidate](https://talos-ai-ten.vercel.app/fixtures/checkout?variant=candidate) sends the value created by the current submission and returns a fixture receipt.
 
 Both paths are conspicuously labeled `FIXTURE`; neither touches Stripe or represents revenue.
 

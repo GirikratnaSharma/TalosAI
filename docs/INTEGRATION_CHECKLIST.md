@@ -44,8 +44,7 @@ The core four are intentionally load-bearing. Do not add another sponsor unless 
 
 ## Deployment and orchestration
 
-- [x] Deploy the app and controlled target on Vercel.
-- [ ] Create a scoped Vercel Sharable Link for judges; do not distribute an automation-bypass secret.
+- [x] Deploy the public app and controlled target on Vercel; verify the production domain without an authenticated session.
 - [ ] Deploy a Render Workflow only if entering the Render track; do not make it a decorative duplicate coordinator.
 - [ ] Keep the durable workflow event-driven: provider callbacks wake it; provider retrieval supplies authority.
 - [ ] Add Band only if its room performs a real, blocking handoff. Do not ship a decorative agent chat.
