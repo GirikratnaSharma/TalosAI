@@ -4,7 +4,7 @@ Talos is an autonomous repair company for one bounded class of broken React/Next
 
 **No proof. No payment.**
 
-[Open the deployed company ledger](https://talos-ai-abhinavggargs-projects.vercel.app)
+[Open the Vercel deployment](https://talos-ai-abhinavggargs-projects.vercel.app) (currently protected by the team's Vercel Authentication; create a scoped Sharable Link before sending it to judges).
 
 ## The company
 
