@@ -1,6 +1,7 @@
 export const PROVIDER_NAMES = [
   "replay",
   "superserve",
+  "pioneer",
   "terac",
   "stripe",
   "render",

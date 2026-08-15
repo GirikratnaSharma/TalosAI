@@ -87,3 +87,11 @@ export interface TeracAdapter extends AdapterIdentity<"terac"> {
     >
   >;
 }
+
+export { createTeracClient, TeracProviderError } from "../providers/terac";
+export type {
+  CreateTeracClientInput,
+  TeracClient,
+  TeracStudyProgress,
+  TeracStudyResult,
+} from "../providers/terac";

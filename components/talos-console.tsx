@@ -15,6 +15,7 @@ import {
   Code2,
   ExternalLink,
   FileCheck2,
+  FileJson2,
   FlaskConical,
   Landmark,
   Link2,
@@ -36,7 +37,7 @@ import {
   type LedgerStatus,
 } from "@/lib/ui/demo-case";
 
-const roleIcons: LucideIcon[] = [Bot, Code2, UserRoundCheck, WalletCards];
+const roleIcons: LucideIcon[] = [Bot, FileJson2, Code2, UserRoundCheck, WalletCards];
 
 const statusIcons: Record<LedgerStatus, LucideIcon> = {
   complete: Check,
@@ -67,7 +68,7 @@ function Roster() {
     <aside className="roster-panel" aria-labelledby="roster-title">
       <div className="panel-heading">
         <div>
-          <p className="micro-label">Company / 04 roles</p>
+          <p className="micro-label">Company / 05 roles</p>
           <h2 id="roster-title">Operating roster</h2>
         </div>
         <Building2 size={20} aria-hidden="true" />
@@ -130,11 +131,13 @@ function LedgerRow({
     <li
       className={`ledger-row ledger-row--${event.status}${
         event.isVeto ? " ledger-row--veto" : ""
-      }${event.attempt ? ` ledger-row--attempt-${event.attempt}` : ""}`}
+      }${event.isCompilerGate ? " ledger-row--compiler" : ""}${
+        event.attempt ? ` ledger-row--attempt-${event.attempt}` : ""
+      }`}
     >
-      {event.id === "attempt-two" ? (
+      {event.id === "pioneer-spec-retry" ? (
         <span className="retry-connector" aria-hidden="true">
-          <RefreshCcw size={13} /> retry after veto
+          <RefreshCcw size={13} /> recompile after veto
         </span>
       ) : null}
       <button
@@ -209,8 +212,9 @@ function EvidenceInspector({ event }: { event: LedgerEvent }) {
         <div>
           <strong>Append-only decision record</strong>
           <p>
-            In live mode, every verdict points to the source recording, candidate
-            commit, study result, and order state transition.
+            In live mode, every verdict points to the source recording, Pioneer
+            extraction, Talos policy record, candidate commit, study result, and
+            order state transition.
           </p>
         </div>
       </div>
@@ -325,8 +329,10 @@ export function TalosConsole() {
             </h1>
           </div>
           <p className="intro-copy">
-            Talos sells outcome-backed repairs to broken revenue flows. Engineering
-            can propose a fix; an external Replay verdict and a fresh Terac holdout
+            Talos sells outcome-backed repairs to broken revenue flows. Pioneer
+            extracts root cause and risk from Replay evidence; deterministic Talos
+            policy intersects that result with the repository&apos;s predeclared file
+            allowlist before Engineering can start. Replay and a fresh Terac holdout
             decide whether Stripe ever unlocks payment.
           </p>
         </section>
@@ -373,6 +379,14 @@ export function TalosConsole() {
                   <h2 id="timeline-title">Decision record</h2>
                 </div>
                 <span>Click any record to inspect</span>
+              </div>
+
+              <div className="compiler-rule" role="note">
+                <FileJson2 size={15} aria-hidden="true" />
+                <span>
+                  <strong>Pioneer evidence + Talos policy gate</strong>
+                  Stale evidence or empty allowlist intersection → Superserve VM never starts
+                </span>
               </div>
 
               <ol className="ledger-list">

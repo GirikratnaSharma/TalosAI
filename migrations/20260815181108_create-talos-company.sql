@@ -19,6 +19,7 @@ CREATE TABLE public.talos_orders (
     state IN (
       'DRAFT',
       'DIAGNOSING',
+      'SPECIFYING',
       'PATCHING',
       'REPLAY_VERIFYING',
       'HUMAN_VERIFYING',
@@ -40,6 +41,9 @@ CREATE TABLE public.talos_orders (
   minimum_participants SMALLINT NOT NULL CHECK (minimum_participants > 0),
   minimum_completion_rate NUMERIC(6,5) NOT NULL CHECK (minimum_completion_rate BETWEEN 0 AND 1),
   minimum_absolute_lift NUMERIC(6,5) NOT NULL CHECK (minimum_absolute_lift > 0 AND minimum_absolute_lift <= 1),
+  patch_spec_id TEXT,
+  patch_spec_sha256 TEXT,
+  patch_spec_model_id TEXT,
   candidate_sha TEXT,
   candidate_preview_url TEXT,
   replay_project_id TEXT,
@@ -53,6 +57,15 @@ CREATE TABLE public.talos_orders (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CHECK (candidate_sha IS NULL OR candidate_preview_url IS NOT NULL),
+  CHECK (
+    (patch_spec_id IS NULL AND patch_spec_sha256 IS NULL AND patch_spec_model_id IS NULL)
+    OR
+    (patch_spec_id IS NOT NULL AND patch_spec_sha256 ~ '^[a-f0-9]{64}$' AND patch_spec_model_id IS NOT NULL)
+  ),
+  CHECK (
+    state NOT IN ('PATCHING', 'REPLAY_VERIFYING', 'HUMAN_VERIFYING', 'AWAITING_PAYMENT', 'DELIVERING', 'DELIVERED')
+    OR patch_spec_id IS NOT NULL
+  ),
   CHECK (state <> 'DELIVERED' OR delivery_receipt_id IS NOT NULL),
   CHECK (state <> 'CLOSED_NO_CHARGE' OR payment_intent_id IS NULL),
   CHECK (state NOT IN ('AWAITING_PAYMENT', 'DELIVERING', 'DELIVERED') OR certificate_id IS NOT NULL),
@@ -85,11 +98,12 @@ CREATE TABLE public.talos_command_outbox (
   order_id UUID NOT NULL REFERENCES public.talos_orders(id) ON DELETE RESTRICT,
   command_type TEXT NOT NULL,
   semantic_key TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'RUNNING', 'COMPLETE', 'RETRY')),
+  status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'RUNNING', 'COMPLETE', 'RETRY', 'FAILED')),
   attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   claimed_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
+  failed_at TIMESTAMPTZ,
   provider_receipt TEXT,
   last_error_code TEXT,
   payload JSONB NOT NULL DEFAULT '{}'::JSONB,
@@ -103,7 +117,7 @@ CREATE INDEX talos_command_outbox_claim_idx
 
 CREATE TABLE public.talos_provider_inbox (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  provider TEXT NOT NULL CHECK (provider IN ('stripe', 'replay', 'terac', 'superserve')),
+  provider TEXT NOT NULL CHECK (provider IN ('stripe', 'replay', 'pioneer', 'terac', 'superserve')),
   provider_event_id TEXT NOT NULL,
   payload_hash TEXT NOT NULL,
   received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -115,7 +129,7 @@ CREATE TABLE public.talos_evidence (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id UUID NOT NULL REFERENCES public.talos_orders(id) ON DELETE RESTRICT,
   evidence_type TEXT NOT NULL CHECK (
-    evidence_type IN ('REPLAY_BASELINE', 'REPLAY_VERIFICATION', 'TERAC_BASELINE', 'TERAC_HOLDOUT', 'SANDBOX_BUILD', 'PAYMENT', 'DELIVERY')
+    evidence_type IN ('REPLAY_BASELINE', 'REPLAY_VERIFICATION', 'PIONEER_PATCH_SPEC', 'TERAC_BASELINE', 'TERAC_HOLDOUT', 'SANDBOX_BUILD', 'PAYMENT', 'DELIVERY')
   ),
   provider TEXT NOT NULL,
   provider_reference TEXT NOT NULL,

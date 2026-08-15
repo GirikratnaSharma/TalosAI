@@ -34,6 +34,16 @@ export const PROVIDER_ENVIRONMENT_SPECS = {
     requiredForCore: true,
     defaultMode: "fixture",
   },
+  pioneer: {
+    modeVariable: "TALOS_PIONEER_MODE",
+    requiredVariables: [
+      "PIONEER_API_URL",
+      "PIONEER_API_KEY",
+      "PIONEER_MODEL_ID",
+    ],
+    requiredForCore: true,
+    defaultMode: "fixture",
+  },
   terac: {
     modeVariable: "TALOS_TERAC_MODE",
     requiredVariables: ["TERAC_API_URL", "TERAC_API_KEY"],

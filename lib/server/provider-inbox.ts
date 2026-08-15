@@ -8,7 +8,29 @@ const environmentSchema = z.object({
   INSFORGE_API_KEY: z.string().trim().min(1),
 });
 
-const providerSchema = z.enum(["stripe", "replay", "terac", "superserve"]);
+export const PROVIDER_INBOX_PROVIDERS = [
+  "stripe",
+  "replay",
+  "pioneer",
+  "terac",
+  "superserve",
+] as const;
+
+const providerSchema = z.enum(PROVIDER_INBOX_PROVIDERS);
+
+export type ProviderInboxProvider = z.infer<typeof providerSchema>;
+
+const providerInboxInputSchema = z
+  .object({
+    provider: providerSchema,
+    providerEventId: z.string().min(1).max(255),
+    payloadHash: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strip();
+
+export function parseProviderInboxInput(input: unknown) {
+  return providerInboxInputSchema.parse(input);
+}
 
 export interface ProviderInboxReceipt {
   id: string;
@@ -39,17 +61,11 @@ export function createProviderInbox(
 
   return {
     async record(input: {
-      provider: z.infer<typeof providerSchema>;
+      provider: ProviderInboxProvider;
       providerEventId: string;
       payloadHash: string;
     }): Promise<ProviderInboxReceipt> {
-      const parsed = z
-        .object({
-          provider: providerSchema,
-          providerEventId: z.string().min(1).max(255),
-          payloadHash: z.string().regex(/^[a-f0-9]{64}$/),
-        })
-        .parse(input);
+      const parsed = parseProviderInboxInput(input);
 
       const existing = await client.database
         .from("talos_provider_inbox")
