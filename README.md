@@ -1,165 +1,180 @@
-# Talos — the autonomous repair company that cannot lie
+# Talos — the autonomous repair company that cannot mark its own homework
 
-**Give Talos one broken revenue flow. It gets paid only after independent machines and fresh humans prove the repair.**
+**Give Talos one broken revenue flow. It repairs it — and it is structurally incapable of certifying its own work.**
 
-Talos is a zero-employee software repair company for a bounded class of broken React/Next.js revenue flows. It is built on one principle: **no agent in this company marks its own homework.** The agent that writes the patch has no authority to approve it, the systems that verify it have no ability to modify it, and payment is structurally impossible until both proofs exist.
+Talos is a zero-employee software repair company for a bounded class of broken React/Next.js revenue flows. One principle holds the whole thing up: **the party that does the work is never the party that approves it.** The agent that writes the patch cannot diagnose it, cannot test it, and cannot release it. Payment is unreachable until an independent machine and a fresh panel of real humans both agree the repair worked.
+
+We do not automate QA — Replay does that, and we buy it from them. **Talos automates the repair and purchases the proof.**
 
 **No proof. No payment.**
 
-🔗 **[Live company ledger](https://talos-ai-ten.vercel.app)** · [Seeded broken checkout](https://talos-ai-ten.vercel.app/fixtures/checkout?variant=baseline) · [Repaired candidate](https://talos-ai-ten.vercel.app/fixtures/checkout?variant=candidate) · [140-second demo runbook](docs/DEMO_RUNBOOK.md)
+🔗 **[Live company ledger](https://talos-ai-ten.vercel.app)** · [Broken checkout](https://talos-ai-ten.vercel.app/fixtures/checkout?variant=baseline) · [Repaired candidate](https://talos-ai-ten.vercel.app/fixtures/checkout?variant=candidate) · [Health / provider status](https://talos-ai-ten.vercel.app/api/health) · [Demo runbook](docs/DEMO_RUNBOOK.md)
 
 ---
 
-## How an order flows
+## The order lifecycle
 
 ```
-Customer authorizes one repo, one broken journey
+Customer authorizes one repository, one broken journey
         │
         ▼
-DIAGNOSING ──── Replay reproduces & root-causes the bug (Talos may not self-diagnose)
-        │        Terac baseline: real people attempt the broken flow — raw counts recorded
+DIAGNOSING ────── REPLAY independently reproduces and root-causes the defect.
+        │         TERAC baseline cohort attempts the broken flow — raw counts recorded.
         ▼
-SPEC ────────── Pioneer's open-weight model classifies Replay's evidence; Talos intersects
-        │        it with a manifest pinned to the audited SHA and hashes an immutable
-        │        repair specification. No valid spec → the sandbox never starts.
+SPECIFYING ────── PIONEER (GLiNER2) compiles Replay's raw report into typed bug facts.
+        │         Talos intersects them with a file manifest pinned to the audited SHA
+        │         and hashes an immutable repair specification. No spec → no sandbox.
         ▼
-PATCHING ────── Repair agent gets two attempts, inside an isolated Superserve VM
-        │        No provider credentials, no payment code, no migrations. Exact SHA pinned.
+PATCHING ──────── The repair agent executes ONLY that specification inside an isolated
+        │         SUPERSERVE VM. No provider or payment credentials in the cell.
+        │         Two attempts maximum.
         ▼
-REPLAY_VERIFYING ── Replay retests the EXACT candidate build. Anything less than
-        │            strictly clean — one open, invalid, or wontfix finding — is a VETO.
+REPLAY_VERIFYING  REPLAY retests the EXACT candidate build, matched by SHA against
+        │         /api/version. One open, invalid, or wontfix finding = VETO.
         ▼
-HUMAN_VERIFYING ─── A fresh, disjoint Terac cohort attempts the repaired flow.
-        │            Completion must beat the predeclared threshold and lift.
+HUMAN_VERIFYING   A fresh, provably disjoint TERAC cohort attempts the repaired flow.
+        │         Must beat the completion threshold and lift frozen at contract time.
         ▼
-AWAITING_PAYMENT ── Only now does Stripe reveal the payment link. Signed webhook,
-        │            authoritative re-fetch, idempotent delivery. Pay once, deliver once.
+AWAITING_PAYMENT  Only now does STRIPE reveal the payment link. Signed webhook,
+        │         authoritative re-fetch, durable dedup. Pay once, deliver once.
         ▼
-DELIVERED           …or CLOSED_NO_CHARGE. Two failed attempts and Talos walks away.
+DELIVERED         …or CLOSED_NO_CHARGE. Two failed attempts and the company walks
+                  away, having charged nothing.
 ```
 
-Every transition is an append-only journal entry naming the actor, exact build SHA, provider receipt, evidence link, and financial effect. **The decision journal is the product.**
-
-## The company at a glance
-
-| Responsibility | System | Authority |
-| --- | --- | --- |
-| General manager | Talos policy engine | Accept or reject a bounded repair contract |
-| Machine witness | Replay, outside Talos | Block release when the exact candidate is not clean |
-| Evidence compiler | Pioneer open-weight model + Talos policy | Extract evidence-backed bug facts; intersect them with a predeclared repository manifest and hash the resulting repair contract |
-| Repair engineer | Talos inside Superserve | Execute only the accepted specification; cannot approve its own candidate |
-| Human witness | Fresh Terac cohort | Prove the declared task-completion outcome improved |
-| Treasurer | Stripe | Reveal the one organizer-approved Payment Link only after both proofs |
+Every transition is an append-only journal entry naming the actor, the exact build SHA, the provider receipt, the evidence link, and the financial effect. **The decision journal is the product.**
 
 ---
 
-## Every role is a sponsor system with real authority
+## What each system actually does
 
-Talos is not a chat room of agents role-playing executives. Each department is a real external system holding authority the others cannot override.
+### 🟢 REPLAY — the release authority
 
-### 🟢 Replay — the release authority (the reason Talos can exist)
+**Replay is the dominant power in this company, and every other component is arranged around that fact.** It is the independent machine witness, and it holds a veto no part of Talos can route around.
 
-Replay is the dominant power in this company, and deliberately so. It is the **independent machine witness** with a **non-bypassable veto** over every release:
+| What it does | Concretely |
+| --- | --- |
+| **Discovers** the defect | Talos is forbidden from diagnosing its own work order. Replay explored the app on its own and filed **9 bugs — 8 of which we never planted.** |
+| **Root-causes** it | It traced the seeded defect through *minified JavaScript with no source maps*: the component reads stale React state (`c`) instead of the ID generated in that submission (`a`), so the POST carries an empty `intentId` and the server returns `422 INTENT_ID_MISSING`. Full reproduction steps, screenshots, and a hosted recording. |
+| **Retests** the exact build | Verification is bound by SHA against the deployed `/api/version`. Not "a" build — *the* build Talos claims to have repaired. |
+| **Vetoes** release | A clean run is strict: finished, idle, **zero** open findings, **zero** dismissed as `invalid` or `wontfix`. The policy engine treats dismissed findings as manufactured cleanliness and refuses certification outright. |
+| **Files evidence** | Connected to GitHub Issues on this repository — every bug Replay finds is filed here by Replay's own integration, with root cause, steps, screenshots, and recording. Third-party evidence, in the open. |
+| **Watches every deploy** | The repo is connected to Replay QA; new deployments are detected and retested automatically. |
 
-- Replay **finds and root-causes** the bug — the repair agent is forbidden from diagnosing its own work order.
-- Replay **retests the exact candidate build**, verified by SHA against the deployed `/api/version` — not "a" build, *the* build.
-- A clean run is defined strictly: idle, finished, **zero** open findings, **zero** dismissed as `invalid` or `wontfix`. The policy engine treats dismissed findings as evidence of manufactured cleanliness and refuses certification.
-- **No clean Replay report → no payment link, no delivery, no revenue.** This gate is enforced in the domain layer (`hasCertifiableEvidence`), not in a prompt. There is no code path around it.
+**No clean Replay report → no payment link, no delivery, no revenue.** This gate lives in the domain layer (`hasCertifiableEvidence`), not in a prompt. There is no code path around it.
 
-An autonomous company is only trustworthy if something it doesn't control can stop it. Replay is that something.
+*Integration note, stated honestly:* Replay publishes no public API (confirmed with Replay during the event). Talos therefore ingests Replay evidence through the channels Replay does provide — hosted report and recording URLs, GitHub Issues filed by their integration, automatic retests on deployment, and a token-verified webhook inbox at `/api/webhooks/replay`. Every Replay claim in the ledger links to an artifact Replay itself hosts. Nothing is transcribed by us and presented as theirs.
 
-### 🧑‍🔬 Terac — the human witness (host)
+*An autonomous company is only trustworthy if something it does not control can stop it. Replay is that something.*
 
-Software proof is not outcome proof. Terac's general-population network provides the **only ground truth that matters: can real people actually complete the journey?**
+---
 
-- A **baseline cohort** attempts the broken flow before repair — raw counts, no massaging.
-- A **holdout cohort** — provably fresh, disjoint by cohort fingerprint, baseline explicitly excluded — attempts the repaired candidate.
-- Certification requires the predeclared completion threshold **and** minimum absolute lift. Thresholds are frozen at contract time; they cannot be tuned after results arrive.
+### 🧑‍🔬 TERAC — the human witness (host)
 
-Talos does not grade its own outcomes. Strangers do.
+Software passing tests is not the same as a person succeeding. Terac supplies the only ground truth that matters: **can a real human complete the journey?**
 
-### 🧾 Pioneer — the specification compiler that authorizes work
+- **Baseline cohort** (`an6hs3jus9r0edp1bmd1bgjs`) — general-population participants attempted the *broken* flow. Raw counts, no massaging.
+- **Holdout cohort** (`gah2yu8adyu0kjdqrpny49yq`) — a **provably fresh** panel attempts the *repaired* candidate. Freshness is enforced at recruitment by a screener that rejects anyone who took the baseline, and again in policy by cohort-fingerprint disjointness.
+- **Thresholds frozen before data.** Minimum participants, minimum completion rate, and minimum absolute lift are fixed at contract time and cannot be tuned once results arrive.
+- Results are pulled programmatically via the Terac API v2 with the organization key.
 
-Between diagnosis and repair sits a stage most autonomous coders skip: **turning messy evidence into a bounded contract.** Pioneer's open-weight model classifies Replay's raw root-cause evidence into typed, evidence-backed bug facts, and that classification is what authorizes the sandbox:
+*Talos does not grade its own outcomes. Strangers do.*
 
-- **Every attempt requires a fresh Pioneer classification bound to the exact Replay evidence.** Talos intersects it with a repository manifest pinned to the original SHA and produces an **immutable, SHA-256-hashed repair specification.**
-- **Raw model output is never executed.** Only the validated structured specification, with its immutable ID and hash, may authorize Superserve work — and Talos, not Pioneer, owns file scope and safety policy. A malicious model response suggesting extra files is ignored by construction.
-- The state machine **cannot start Superserve without it**: the spec gate emits the canonical `PATCH_SPEC_COMPILED` event, and a failed repair attempt invalidates the spec, forcing re-classification rather than blind retry.
+---
 
-This is how a small open model becomes genuinely useful in an autonomous company: a compiler with no authority, feeding an engineer with no judgment, judged by an inspector with no pen.
+### 🧾 PIONEER — the specification compiler that authorizes work
 
-### 🏗️ Superserve — the isolated repair floor
+Between diagnosis and repair sits the stage most autonomous coders skip: **turning messy evidence into a bounded, executable contract.**
 
-All repair work happens inside a disposable **Superserve VM**: one per order, cloned from the authorized repo at a pinned base SHA, **no provider or payment credentials inside the cell**, executing only the accepted specification. The sandbox is what makes autonomous code modification a bounded, insurable action instead of a leap of faith — the agent can be wrong in there, and nothing outside can break.
+- Pioneer's open-weight model (**GLiNER2**, a Fastino model built for structured extraction) reads Replay's raw root-cause report and emits **typed, evidence-backed bug facts** — bug class, affected route, expected behavior, risk.
+- Talos intersects those facts with a **repository manifest pinned to the audited SHA** and produces an **immutable, SHA-256-hashed repair specification.** Pioneer proposes; Talos — not Pioneer — owns file scope and safety policy, so a model response inventing extra files is ignored by construction.
+- **The state machine cannot start Superserve without a valid spec** bound to that exact Replay evidence. Every failed attempt invalidates the spec, forcing re-classification rather than blind retry.
+- **Raw model output is never executed.** Only the validated, hashed specification can authorize work.
 
-### 💳 Stripe — the treasurer that pays only on proof
+*A compiler with no authority, feeding an engineer with no judgment, judged by an inspector with no pen.*
 
-Stripe is the company's financial constitution:
+---
 
-- The payment link is revealed **only after dual certification** — charge-on-verification, an SLA that enforces itself.
-- Signed webhooks with raw-body verification, registered Payment Link ID matching, `client_reference_id` order reconciliation, and authoritative Checkout Session re-fetch — the webhook is a doorbell, never the source of truth.
-- A **durable dedup inbox**: replay the same event twice and delivery count stays exactly one.
-- Revenue accounting is honest by construction: only livemode payments matching the exact contract amount count (`isCountableLiveRevenue`); test and demo data are structurally excluded and visibly labeled.
+### 🏗️ SUPERSERVE — the isolated repair floor
+
+Autonomous code modification is only safe if the blast radius is bounded. Every repair runs in a **disposable Superserve VM**, one per order:
+
+- Cloned from the authorized repository at a **pinned base SHA**.
+- **No provider credentials, no payment credentials inside the cell** — the sandbox cannot reach Stripe, Terac, or the ledger.
+- Executes **only** the accepted specification: no production writes, no migrations, no auth changes, and never any change to payment code.
+- Two attempts, then the order closes unpaid.
+
+*The agent is allowed to be wrong in there, and nothing outside can break.*
+
+---
+
+### 💳 STRIPE — the treasurer that pays only on proof
+
+Stripe is the company's financial constitution, and it is wired the way a payments engineer would expect:
+
+- **Charge-on-verification.** The payment link is revealed only after dual certification — the SLA enforces itself.
+- **Raw-body signature verification**, then the webhook is treated as a doorbell, never as truth: Talos re-fetches the Checkout Session from Stripe's API as the authority.
+- **Registered payment-link matching** (`plink_…`) plus `client_reference_id` reconciliation — *a payment that cannot be attributed to an order is refused.* Verified live: an unattributed payment returns `400 ORDER_REFERENCE_MISSING`.
+- **Durable dedup inbox.** Verified live: the same event delivered twice returns `{"received":true,"duplicate":true,"effect":"ALREADY_ENQUEUED"}` — one payment, one record, one delivery.
+- **Honest revenue accounting.** Only livemode payments matching the exact contract amount count (`isCountableLiveRevenue`); test and demo data are structurally excluded and visibly labeled.
+
+Durable state lives in an InsForge Postgres backend (`talos_orders`, `talos_provider_inbox`, `talos_evidence`, `talos_order_events`). When persistence is unavailable the webhook **fails closed with 503** and asks Stripe to retry, rather than acknowledging a payment it cannot record.
+
+---
+
+### ⚪ BAND and RENDER — deliberately not wired
+
+Both exist in this repository as **typed adapter contracts only**. Neither is claimed as live, neither appears in the release path, and `/api/health` reports both as `disabled`.
+
+We would rather ship four provably live integrations than six half-wired ones. If a claim isn't in the code, it isn't in this README.
 
 ---
 
 ## The core contract: what Talos will not do
 
-Honesty about limits is part of the product:
-
-- One customer-authorized repository, one critical journey, one bounded repair class per order.
-- Maximum **two** repair attempts in a Superserve sandbox — then `CLOSED_NO_CHARGE`. The company walks away rather than thrash.
-- No production writes, no database migrations, no auth changes, and **never** changes to payment code.
+- One authorized repository, one critical journey, one bounded repair class per order.
+- Maximum **two** repair attempts — then `CLOSED_NO_CHARGE`.
+- No production writes, no database migrations, no auth changes, no payment-code changes.
 - Raw model output is never executed; only a validated, hashed specification authorizes work.
 - Replay findings cannot be dismissed as `invalid` or `wontfix` to manufacture a clean result.
-- Baseline and holdout Terac cohorts are disjoint; raw counts are retained.
-- Stripe payment is requested only after certification: no clean report, no charge.
+- Baseline and holdout cohorts must be disjoint; raw counts are retained.
+- Stripe payment is requested only after certification.
 - Demo data is visibly labeled and excluded from revenue and business metrics.
 
-## Controlled Replay target
+---
 
-The repo includes a deterministic checkout bug so the full fail → veto → repair → certify story is reproducible without trusting an arbitrary customer repository:
+## The controlled target
 
-- [Seeded baseline](https://talos-ai-ten.vercel.app/fixtures/checkout?variant=baseline) sends a stale empty intent ID and must return `422 INTENT_ID_MISSING`.
-- [Repaired candidate](https://talos-ai-ten.vercel.app/fixtures/checkout?variant=candidate) sends the value created by the current submission and returns a fixture receipt.
+A deterministic checkout defect ships in this repo so the full fail → veto → repair → certify story is reproducible without trusting an arbitrary customer repository:
 
-Both paths are conspicuously labeled `FIXTURE`; neither touches Stripe or represents revenue.
+- [**Baseline**](https://talos-ai-ten.vercel.app/fixtures/checkout?variant=baseline) — sends a stale empty intent ID, returns `422 INTENT_ID_MISSING`.
+- [**Candidate**](https://talos-ai-ten.vercel.app/fixtures/checkout?variant=candidate) — sends the value created in that submission, returns a fixture receipt.
 
-## Current integration state
+Both are conspicuously labeled `FIXTURE`. Neither touches Stripe or represents revenue.
 
-- Domain policy, the Pioneer specification gate, two-attempt reducer, proof gates, receipt sanitization, and invariant/adapter/API tests are implemented.
-- The Talos company ledger and evidence inspector are implemented and deployed.
-- InsForge order/event reads fall back only for the known `TAL-D04` demo and disclose that provenance in the response and `X-Talos-Provenance` header.
-- Stripe has an implemented raw-body signature boundary, authoritative Checkout Session re-fetch, registered Payment Link ID check, `client_reference_id` order reconciliation, and durable provider-inbox deduplication.
-- Pioneer is load-bearing in the domain flow: the live-client result has a tested bridge into the canonical `PATCH_SPEC_COMPILED` event, while Talos—not Pioneer—owns file scope and safety policy. A run is not a live Pioneer run unless a real API key and provider receipt are present; without them, the structured result is labeled fixture/demo evidence.
-- The bounded Superserve lifecycle/exec client is implemented and fail-closed; the higher-level repair orchestrator remains a separate contract. It has not been live-tested and cannot qualify as live Superserve usage until issued credentials produce a real sanitized provider receipt.
-- Replay offers no public API today (confirmed with Replay at the event); evidence is ingested through Replay-hosted report and recording URLs, bugs filed to this repo's GitHub Issues by Replay's own integration, automatic retests on new deployments, and a token-verified webhook inbox at `/api/webhooks/replay`. Every Replay claim links to the artifact Replay hosts.
-- Terac live credentials are configured and the baseline human study (TAL-0001 · baseline · checkout) was launched during the event with real general-population participants; raw counts land in the ledger as they are approved.
-- Band and Render adapters are typed contracts only — deliberately out of scope for this build; neither is claimed as wired, and nothing in the release path depends on them.
+---
 
 ## Verify it yourself
 
 ```bash
 npm install
-npm run check   # invariant, adapter, and API tests · typecheck · lint
+npm run check   # 137 invariant, adapter, and API tests · typecheck · lint
 npm run build
 ```
 
-Copy `.env.example` to `.env.local` and add credentials as they are issued. The product defaults to an explicitly labeled demo mode while provider credentials are unavailable. Do not copy a parent `.insforge/project.json` into this repository; link Talos to the intended `mitos-preview` backend explicitly before applying the migration.
-
 | Endpoint | What it proves |
 | --- | --- |
-| [`/api/orders/TAL-D04`](https://talos-ai-ten.vercel.app/api/orders/TAL-D04) | Provenance-labeled ledger read model |
-| `/api/health` | Provider readiness — names, never secret values |
-| `/api/version` | Exact deployed commit SHA (build identity for Replay verification) |
-| `/api/webhooks/stripe` | Signed Stripe webhook inbox with durable deduplication |
+| [`/api/health`](https://talos-ai-ten.vercel.app/api/health) | Live provider status — names only, never secret values |
+| [`/api/version`](https://talos-ai-ten.vercel.app/api/version) | Exact deployed commit SHA (build identity for Replay verification) |
+| `/api/webhooks/stripe` | Signed Stripe inbox with durable deduplication |
+| `/api/webhooks/replay` | Token-verified Replay event inbox |
 
-More: [Threat model](docs/THREAT_MODEL.md) · [Sponsor integration checklist](docs/INTEGRATION_CHECKLIST.md) · [Demo runbook](docs/DEMO_RUNBOOK.md)
+More: [Threat model](docs/THREAT_MODEL.md) · [Integration checklist](docs/INTEGRATION_CHECKLIST.md) · [Demo runbook](docs/DEMO_RUNBOOK.md)
 
 ---
 
 ## The close
 
-> **The agent repaired it. Replay proved the software. Fresh people proved the outcome. The ledger proves every step.**
+> **The agent repaired it. Replay proved the software. Fresh people proved the outcome. Stripe proved somebody paid.**
 
 Built at the Zero-Human Company Hackathon by Terac — San Francisco, August 15, 2026.
